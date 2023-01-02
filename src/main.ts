@@ -128,10 +128,33 @@ const statusCodeToString = (
     }`;
 };
 
+const tryGetFileType = (path: string) => {
+    const extension = path.slice(path.lastIndexOf(".") + 1);
+    switch (extension) {
+        case "js":
+            return "application/javascript";
+        case "json":
+            return "application/json";
+        case "css":
+            return "text/css";
+        case "html":
+            return "text/html";
+        case "txt":
+            return "text/plain";
+        case "png":
+            return "image/png";
+        case "ico":
+            return "image/x-icon";
+        default:
+            return "text/plain";
+    }
+};
+
+// TODO: Not functional, change to functional approach
+// https://www.rfc-editor.org/rfc/rfc3986#section-6.2.3
 const removeDots = (uri: string) => {
     let inputBuffer = uri;
     const outBuffer: string[] = [];
-    // https://www.rfc-editor.org/rfc/rfc3986#section-6.2.3
     while (inputBuffer.length > 0) {
         if (inputBuffer.indexOf("../") === 0) {
             // A
@@ -177,7 +200,7 @@ const removeWhitespace = (uri: string) => {
 };
 
 const normalizeURI = (uri: string): string => {
-    return removeDots(removeWhitespace(decodeURI(uri)));
+    return compose(removeDots, removeWhitespace, decodeURI)(uri);
 };
 
 const parseHeaders = (data: string) => {
@@ -200,17 +223,14 @@ const getPayload = (headers: RequestHeaders, data: string) => {
         return undefined;
     }
     const payload = compose(
-        (next: { data: string[]; index: number }) => {
-            return next.data.slice(next.index, next.data.length).join("");
+        ([split, index]: [string[], number]) => {
+            return split.slice(index, split.length).join("");
         },
-        (next: { split: string[] }) => {
-            return {
-                data: next.split,
-                index: next.split.findIndex((line) => line === "") + 1,
-            };
+        (split: string[]) => {
+            return [split, split.findIndex((line) => line === "") + 1];
         },
         (initialData: string) => {
-            return { split: initialData.split("\r\n") };
+            return initialData.split("\r\n");
         }
     )(data);
     if (contentType === "application/json") {
@@ -223,11 +243,11 @@ const getPayload = (headers: RequestHeaders, data: string) => {
 };
 
 const parseRequest = (data: string): Request | undefined => {
-    const lines = data.split("\r\n");
-    const methodSplits = lines[0].split(" ");
-    const method = methodSplits[0].toLowerCase();
-    const uri = normalizeURI(methodSplits[1].toLowerCase());
-    const protocolVersion = methodSplits[2];
+    const [method, uri, protocolVersion] = data
+        .split("\r\n")[0]
+        .split(" ")
+        .slice(0, 3)
+        .map((val) => val.toLowerCase());
     const headers = parseHeaders(data);
     switch (method) {
         case HTTPMethods.GET:
@@ -239,7 +259,7 @@ const parseRequest = (data: string): Request | undefined => {
         case HTTPMethods.PATCH:
             return {
                 method,
-                path: uri,
+                path: normalizeURI(uri),
                 protocolVersion,
                 headers,
                 payload: undefined,
@@ -248,7 +268,7 @@ const parseRequest = (data: string): Request | undefined => {
         case HTTPMethods.PUT:
             return {
                 method,
-                path: uri,
+                path: normalizeURI(uri),
                 protocolVersion,
                 headers,
                 payload: getPayload(headers, data),
@@ -258,28 +278,64 @@ const parseRequest = (data: string): Request | undefined => {
     }
 };
 
-const matchRoute = (request: Request, ...routes: Route[]) => {
-    return routes.find((route) => {
+const mergeRequestAndRoute = (request: Request, routes: Route[]): any => {
+    if (routes.length > 1) {
+        return [
+            ...mergeRequestAndRoute(
+                request,
+                routes.slice(0, routes.length - 1)
+            ),
+            [request, routes[routes.length - 1]],
+        ];
+    }
+    return [[request, ...routes]];
+};
+
+const matchExactRoute = (merged: [Request, Route][]) => {
+    return merged.find(([request, route]) => {
         return route.method === request.method && route.path === request.path;
     });
 };
 
-const writeNotFoundToSocket = (socket: net.Socket) => {
-    socket.write(
-        `${statusCodeToString(
-            STATUSCODES.NOT_FOUND
-        )}\r\nConnection: keep-alive\r\n\r\n`
-    );
+const matchWildcardRoute = (merged: [Request, Route][]) => {
+    return merged
+        .reduce((wildcardRoutes: [Request, Route][], pair) => {
+            if (pair[1].path.includes("*")) {
+                return [...wildcardRoutes, pair];
+            } else {
+                return [...wildcardRoutes];
+            }
+        }, [])
+        .find(([request, route]) => {
+            const matchBy = route.path.split("*")[0];
+            return (
+                route.method === request.method &&
+                request.path.includes(matchBy)
+            );
+        });
 };
 
-const handleNewConnection = (socket: net.Socket, ...routes: Route[]) => {
+const matchRoute = (request: Request, routes: Route[]) => {
+    const merged = mergeRequestAndRoute(request, routes);
+    const route = matchExactRoute(merged);
+    if (route === undefined) {
+        return matchWildcardRoute(merged);
+    }
+    return route;
+};
+
+const writeNotFoundToSocket = (socket: net.Socket) => {
+    socket.write(makeResponse(STATUSCODES.NOT_FOUND, [], undefined));
+};
+
+const handleNewConnection = (socket: net.Socket, routes: Route[]) => {
     socket.on("data", (buffer) => {
         const data = buffer.toString("utf8");
         const request = parseRequest(data);
         if (request) {
-            const route = matchRoute(request, ...routes);
+            const route = matchRoute(request, routes);
             if (route) {
-                route.action(socket, request);
+                route[1].action(socket, request);
             } else {
                 writeNotFoundToSocket(socket);
             }
@@ -309,7 +365,7 @@ const createServer = (port: number, ...routes: Route[]) => {
             console.log(`Server started... on port: ${port}`);
         })
         .on("connection", (socket: net.Socket) => {
-            handleNewConnection(socket, ...routes);
+            handleNewConnection(socket, routes);
         });
 };
 
@@ -317,7 +373,7 @@ createServer(
     8888,
     route(HTTPMethods.GET, "/", (socket) => {
         compose(
-            (next: { file: string; socket: net.Socket }) => {
+            ([file, socket]: [string, net.Socket]) => {
                 compose(
                     ([response, socket]: [string, net.Socket]) => {
                         socket.write(response);
@@ -335,15 +391,61 @@ createServer(
                             socket,
                         ];
                     }
-                )([next.file, socket]);
+                )([file, socket]);
             },
             (socket: net.Socket) => {
-                return {
+                return [
+                    readFileSync("./index.html", {
+                        encoding: "utf8",
+                    }),
                     socket,
-                    file: readFileSync("test.html", { encoding: "utf8" }),
-                };
+                ];
             }
         )(socket);
+    }),
+    route(HTTPMethods.GET, "/*", (socket, request) => {
+        compose(
+            ([fileContents, socket, request]: [
+                string,
+                net.Socket,
+                Request
+            ]) => {
+                compose(
+                    ([response, socket]: [string, net.Socket]) => {
+                        socket.write(response);
+                    },
+                    ([file, socket, request]: [
+                        string,
+                        net.Socket,
+                        Request
+                    ]) => {
+                        return [
+                            makeResponse(
+                                STATUSCODES.OK,
+                                [
+                                    ["Content-Lenght", file.length.toString()],
+                                    [
+                                        "Content-Type",
+                                        tryGetFileType(request.path),
+                                    ],
+                                ],
+                                file
+                            ),
+                            socket,
+                        ];
+                    }
+                )([fileContents, socket, request]);
+            },
+            ([socket, request]: [net.Socket, Request | undefined]) => {
+                return [
+                    // TODO: crashes when not a file
+                    // TODO: only works for text files, binary files need fixing
+                    readFileSync(`.${request?.path}`),
+                    socket,
+                    request,
+                ];
+            }
+        )([socket, request]);
     }),
     route(HTTPMethods.POST, "/", (socket, request) => {
         if (request) {
