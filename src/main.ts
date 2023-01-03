@@ -22,6 +22,11 @@ type Route = {
     action: (socket: net.Socket, request: Request) => void;
 };
 
+type FileContents = {
+    fileContents: string | Buffer;
+    fileContentType: string;
+};
+
 type StatsCodeTypes =
     | "CONTINUE"
     | "SWITCHING_PROTOCOLS"
@@ -81,14 +86,22 @@ const makeResponse = (
     body: any
 ) => {
     return compose(
-        ([response, otherHeaders, body]: [string, [string, string][], any]) => {
+        ([response, otherHeaders, body]: [
+            string,
+            [string, string][],
+            string | undefined | Buffer
+        ]) => {
             if (
                 otherHeaders.find(([field, _]) => {
                     return field === "Content-Type";
                 }) &&
                 body !== undefined
             ) {
-                return response + body;
+                if (typeof body === "string") {
+                    return response + body;
+                } else {
+                    return Buffer.concat([Buffer.from(response, "utf8"), body]);
+                }
             } else {
                 return response;
             }
@@ -141,12 +154,55 @@ const tryGetFileType = (path: string) => {
             return "text/html";
         case "txt":
             return "text/plain";
+        case "svg":
+            return "image/svg+xml";
         case "png":
             return "image/png";
+        case "gif":
+            return "image/gif";
+        case "jpg":
+        case "jpeg":
+            return "image/jpeg";
+        case "webp":
+            return "image/webp";
         case "ico":
             return "image/x-icon";
+        case "mp3":
+            return "audio/mpeg";
+        case "wav":
+            return "audio/wav";
+        case "mp4":
+            return "video/mp4";
+        case "mpeg":
+            return "video/mpeg";
+        case "ttf":
+            return "font/ttf";
         default:
             return "text/plain";
+    }
+};
+
+const tryReadFile = (request: Request): FileContents | undefined => {
+    try {
+        const fileContents = readFileSync(`.${request.path}`);
+        const fileContentType = tryGetFileType(request.path);
+        if (
+            fileContentType.includes("image/") ||
+            fileContentType.includes("audio/") ||
+            fileContentType.includes("video/")
+        ) {
+            return {
+                fileContents,
+                fileContentType,
+            };
+        } else {
+            return {
+                fileContents: fileContents.toString("utf8"),
+                fileContentType,
+            };
+        }
+    } catch (err) {
+        return undefined;
     }
 };
 
@@ -191,6 +247,7 @@ const removeDots = (uri: string) => {
     return outBuffer.join("");
 };
 
+// WARN: Not a functional function, has mutation
 const removeWhitespace = (uri: string) => {
     let whitespaceFreeUri = uri;
     while (whitespaceFreeUri.indexOf(" ") !== -1) {
@@ -247,9 +304,9 @@ const parseRequest = (data: string): Request | undefined => {
         .split("\r\n")[0]
         .split(" ")
         .slice(0, 3)
-        .map((val) => val.toLowerCase());
+        .map((val) => val);
     const headers = parseHeaders(data);
-    switch (method) {
+    switch (method.toLowerCase()) {
         case HTTPMethods.GET:
         case HTTPMethods.HEAD:
         case HTTPMethods.DELETE:
@@ -258,7 +315,7 @@ const parseRequest = (data: string): Request | undefined => {
         case HTTPMethods.TRACE:
         case HTTPMethods.PATCH:
             return {
-                method,
+                method: method.toLowerCase(),
                 path: normalizeURI(uri),
                 protocolVersion,
                 headers,
@@ -267,7 +324,7 @@ const parseRequest = (data: string): Request | undefined => {
         case HTTPMethods.POST:
         case HTTPMethods.PUT:
             return {
-                method,
+                method: method.toLowerCase(),
                 path: normalizeURI(uri),
                 protocolVersion,
                 headers,
@@ -330,8 +387,7 @@ const writeNotFoundToSocket = (socket: net.Socket) => {
 
 const handleNewConnection = (socket: net.Socket, routes: Route[]) => {
     socket.on("data", (buffer) => {
-        const data = buffer.toString("utf8");
-        const request = parseRequest(data);
+        const request = parseRequest(buffer.toString("utf8"));
         if (request) {
             const route = matchRoute(request, routes);
             if (route) {
@@ -405,44 +461,46 @@ createServer(
     }),
     route(HTTPMethods.GET, "/*", (socket, request) => {
         compose(
-            ([fileContents, socket, request]: [
-                string,
-                net.Socket,
-                Request
-            ]) => {
+            ([fileContents, socket]: [string, net.Socket]) => {
                 compose(
                     ([response, socket]: [string, net.Socket]) => {
                         socket.write(response);
                     },
-                    ([file, socket, request]: [
-                        string,
+                    ([file, socket]: [
+                        FileContents | undefined,
                         net.Socket,
                         Request
                     ]) => {
                         return [
-                            makeResponse(
-                                STATUSCODES.OK,
-                                [
-                                    ["Content-Lenght", file.length.toString()],
-                                    [
-                                        "Content-Type",
-                                        tryGetFileType(request.path),
-                                    ],
-                                ],
-                                file
-                            ),
+                            file !== undefined
+                                ? makeResponse(
+                                      STATUSCODES.OK,
+                                      [
+                                          [
+                                              "Content-Lenght",
+                                              file.fileContents.length.toString(),
+                                          ],
+                                          [
+                                              "Content-Type",
+                                              file.fileContentType,
+                                          ],
+                                      ],
+                                      file.fileContents
+                                  )
+                                : makeResponse(
+                                      STATUSCODES.NOT_FOUND,
+                                      [],
+                                      undefined
+                                  ),
                             socket,
                         ];
                     }
-                )([fileContents, socket, request]);
+                )([fileContents, socket]);
             },
             ([socket, request]: [net.Socket, Request | undefined]) => {
                 return [
-                    // TODO: crashes when not a file
-                    // TODO: only works for text files, binary files need fixing
-                    readFileSync(`.${request?.path}`),
+                    request !== undefined ? tryReadFile(request) : undefined,
                     socket,
-                    request,
                 ];
             }
         )([socket, request]);
