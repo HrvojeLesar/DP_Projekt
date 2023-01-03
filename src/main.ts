@@ -300,12 +300,15 @@ const parseHeaders = (data: string) => {
         }, {});
 };
 
-const getPayload = (headers: RequestHeaders, data: string) => {
+const getPayload = (
+    headers: RequestHeaders,
+    data: string
+): Record<string, string> | string | undefined => {
     const contentType = headers["content-type"];
     if (contentType === undefined) {
         return undefined;
     }
-    const payload = compose(
+    const payload: string = compose(
         ([split, index]: [string[], number]) => {
             return split.slice(index, split.length).join("");
         },
@@ -319,7 +322,12 @@ const getPayload = (headers: RequestHeaders, data: string) => {
     if (contentType === "application/json") {
         return JSON.parse(payload);
     } else if (contentType === "application/x-www-form-urlencoded") {
-        // TODO: handle url encoded
+        return payload
+            .split("&")
+            .reduce((acc: Record<string, string>, current) => {
+                const [field, value] = current.split("=");
+                return { ...acc, [field]: value };
+            }, {});
     } else if (contentType.includes("text/")) {
         return payload;
     }
