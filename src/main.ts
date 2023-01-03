@@ -206,54 +206,56 @@ const tryReadFile = (request: Request): FileContents | undefined => {
     }
 };
 
-// TODO: Not functional, change to functional approach
-// https://www.rfc-editor.org/rfc/rfc3986#section-6.2.3
 const removeDots = (uri: string) => {
-    let inputBuffer = uri;
-    const outBuffer: string[] = [];
-    while (inputBuffer.length > 0) {
-        if (inputBuffer.indexOf("../") === 0) {
-            // A
-            inputBuffer = inputBuffer.replace("../", "");
-        } else if (inputBuffer.indexOf("./") === 0) {
-            // A
-            inputBuffer = inputBuffer.replace("./", "");
-        } else if (inputBuffer.indexOf("/./") === 0) {
-            // B
-            inputBuffer = inputBuffer.replace("/./", "/");
-        } else if (inputBuffer.indexOf("/.") === 0) {
-            // B
-            inputBuffer = inputBuffer.replace("/.", "/");
-        } else if (inputBuffer.indexOf("/../") === 0) {
-            // C
-            inputBuffer = inputBuffer.replace("/../", "/");
-            outBuffer.pop();
-        } else if (inputBuffer.indexOf("/..") === 0) {
-            // C
-            inputBuffer = inputBuffer.replace("/..", "/");
-            outBuffer.pop();
-        } else if (inputBuffer.indexOf("..") === 0) {
-            // D
-            inputBuffer = inputBuffer.replace("..", "");
-        } else if (inputBuffer.indexOf(".") === 0) {
-            // D
-            inputBuffer = inputBuffer.replace(".", "");
-        } else {
-            const part = inputBuffer.substring(0, inputBuffer.indexOf("/", 1));
-            outBuffer.push(part !== "" ? part : inputBuffer);
-            inputBuffer = part !== "" ? inputBuffer.replace(part, "") : "";
-        }
-    }
-    return outBuffer.join("");
+    return removeDotsRecursive(uri).join("");
 };
 
-// WARN: Not a functional function, has mutation
-const removeWhitespace = (uri: string) => {
-    let whitespaceFreeUri = uri;
-    while (whitespaceFreeUri.indexOf(" ") !== -1) {
-        whitespaceFreeUri = whitespaceFreeUri.replace(" ", "");
+const removeDotsRecursive = (uri: string): string[] => {
+    if (uri.length === 0) {
+        return [];
     }
-    return whitespaceFreeUri;
+
+    if (uri.indexOf("../") === 0) {
+        // A
+        return removeDotsRecursive(uri.replace("../", ""));
+    } else if (uri.indexOf("./") === 0) {
+        // A
+        return removeDotsRecursive(uri.replace("./", ""));
+    } else if (uri.indexOf("/./") === 0) {
+        // B
+        return removeDotsRecursive(uri.replace("/./", "/"));
+    } else if (uri.indexOf("/.") === 0) {
+        // B
+        return removeDotsRecursive(uri.replace("/.", "/"));
+    } else if (uri.indexOf("/../") === 0) {
+        // C
+        const buf = removeDotsRecursive(uri.replace("/../", "/"));
+        return buf.slice(0, buf.length - 1);
+    } else if (uri.indexOf("/..") === 0) {
+        // C
+        const buf = removeDotsRecursive(uri.replace("/..", "/"));
+        return buf.slice(0, buf.length - 1);
+    } else if (uri.indexOf("..") === 0) {
+        // D
+        return removeDotsRecursive(uri.replace("..", ""));
+    } else if (uri.indexOf(".") === 0) {
+        // D
+        return removeDotsRecursive(uri.replace(".", ""));
+    } else {
+        const part = uri.substring(0, uri.indexOf("/", 1));
+        return [
+            part !== "" ? part : uri,
+            ...removeDotsRecursive(part !== "" ? uri.replace(part, "") : ""),
+        ];
+    }
+};
+
+const removeWhitespace = (uri: string): string => {
+    if (uri.indexOf(" ") !== -1) {
+        return removeWhitespace(uri.replace(" ", ""));
+    } else {
+        return uri;
+    }
 };
 
 const normalizeURI = (uri: string): string => {
