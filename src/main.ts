@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import net from "net";
 
-type RequestHeaders = Map<string, string>;
+type RequestHeaders = Record<string, string>;
 
 type Request = {
     method: string;
@@ -9,6 +9,8 @@ type Request = {
     protocolVersion: string;
     headers: RequestHeaders | undefined;
     payload: any;
+    queryString: QueryStrings | undefined;
+    pathVariables?: Record<string, string>;
 };
 
 type StatusCode = {
@@ -26,6 +28,8 @@ type FileContents = {
     fileContents: string | Buffer;
     fileContentType: string;
 };
+
+type QueryStrings = Record<string, string>;
 
 type StatsCodeTypes =
     | "CONTINUE"
@@ -182,9 +186,14 @@ const tryGetFileType = (path: string) => {
     }
 };
 
-const tryReadFile = (request: Request): FileContents | undefined => {
+const tryReadFile = (
+    request: Request,
+    prefix: string | undefined = undefined
+): FileContents | undefined => {
     try {
-        const fileContents = readFileSync(`.${request.path}`);
+        const fileContents = readFileSync(
+            `.${prefix ? prefix : ""}${request.path}`
+        );
         const fileContentType = tryGetFileType(request.path);
         if (
             fileContentType.includes("image/") ||
@@ -206,6 +215,7 @@ const tryReadFile = (request: Request): FileContents | undefined => {
     }
 };
 
+// WARN: https://www.rfc-editor.org/rfc/rfc3986#section-6.2.3
 const removeDots = (uri: string) => {
     return removeDotsRecursive(uri).join("");
 };
@@ -262,6 +272,21 @@ const normalizeURI = (uri: string): string => {
     return compose(removeDots, removeWhitespace, decodeURI)(uri);
 };
 
+const extractQueryStrings = (uri: string) => {
+    const lastUriSegment = uri.slice(uri.lastIndexOf("/") + 1);
+    if (lastUriSegment.includes("?")) {
+        return lastUriSegment
+            .slice(lastUriSegment.indexOf("?") + 1)
+            .split("&")
+            .reduce((queryString: QueryStrings, value) => {
+                const [field, val] = value.split("=");
+                return { ...queryString, [field]: val };
+            }, {});
+    } else {
+        return undefined;
+    }
+};
+
 const parseHeaders = (data: string) => {
     const unparsedHeaders = data.split("\r\n");
     const headersEnd = unparsedHeaders.findIndex((line) => line === "");
@@ -271,13 +296,12 @@ const parseHeaders = (data: string) => {
             const colonIndex = line.indexOf(":");
             const field = line.substring(0, colonIndex).toLowerCase();
             const value = line.substring(colonIndex + 1, line.length).trim();
-            acc.set(field, value);
-            return acc;
-        }, new Map());
+            return { ...acc, [field]: value };
+        }, {});
 };
 
 const getPayload = (headers: RequestHeaders, data: string) => {
-    const contentType = headers.get("content-type");
+    const contentType = headers["content-type"];
     if (contentType === undefined) {
         return undefined;
     }
@@ -322,6 +346,7 @@ const parseRequest = (data: string): Request | undefined => {
                 protocolVersion,
                 headers,
                 payload: undefined,
+                queryString: extractQueryStrings(uri),
             };
         case HTTPMethods.POST:
         case HTTPMethods.PUT:
@@ -331,6 +356,7 @@ const parseRequest = (data: string): Request | undefined => {
                 protocolVersion,
                 headers,
                 payload: getPayload(headers, data),
+                queryString: extractQueryStrings(uri),
             };
         default:
             return undefined;
@@ -348,6 +374,26 @@ const mergeRequestAndRoute = (request: Request, routes: Route[]): any => {
         ];
     }
     return [[request, ...routes]];
+};
+
+const pairArrayElements = <T, O>(main: T[], other: O[]): [T, O][] => {
+    if (main.length !== other.length) {
+        return [];
+    }
+    if (main.length === 0 || other.length === 0) {
+        return [];
+    }
+    if (main.length === 1 && other.length === 1) {
+        return [[main[0], other[0]]];
+    } else {
+        return [
+            ...pairArrayElements(
+                main.slice(0, main.length - 1),
+                other.slice(0, other.length - 1)
+            ),
+            [main[main.length - 1], other[other.length - 1]],
+        ];
+    }
 };
 
 const matchExactRoute = (merged: [Request, Route][]) => {
@@ -374,13 +420,79 @@ const matchWildcardRoute = (merged: [Request, Route][]) => {
         });
 };
 
+const matchVariablePathRoute = (merged: [Request, Route][]) => {
+    return merged.reduce(
+        (variablePathRoutes: [Request, Route][], [request, route]) => {
+            const variableSegments = route.path
+                .split("/")
+                .reduce((variableSegments: (string | undefined)[], segment) => {
+                    const openingBracketIdx = segment.indexOf("{");
+                    const closingBrackedIdx = segment.indexOf("}");
+                    if (openingBracketIdx !== -1 && closingBrackedIdx !== -1) {
+                        return [
+                            ...variableSegments,
+                            segment.slice(
+                                openingBracketIdx + 1,
+                                closingBrackedIdx
+                            ),
+                        ];
+                    } else {
+                        return [...variableSegments, undefined];
+                    }
+                }, []);
+            const requestSegments = request.path
+                .split("/")
+                .reduce(
+                    (segments: string[], segment) => [...segments, segment],
+                    []
+                );
+            if (variableSegments.length === requestSegments.length) {
+                const variables = pairArrayElements(
+                    variableSegments,
+                    requestSegments
+                ).reduce(
+                    (
+                        variables: Record<string, string>,
+                        [vSegment, rSegment]
+                    ) => {
+                        if (vSegment !== undefined) {
+                            return { ...variables, [vSegment]: rSegment };
+                        } else {
+                            return { ...variables };
+                        }
+                    },
+                    {}
+                );
+                const requestWithPathVariables: Request = {
+                    ...request,
+                    pathVariables: variables,
+                };
+                const pair: [Request, Route] = [
+                    requestWithPathVariables,
+                    route,
+                ];
+                return [...variablePathRoutes, pair];
+            } else {
+                return [...variablePathRoutes];
+            }
+        },
+        []
+    )[0];
+};
+
 const matchRoute = (request: Request, routes: Route[]) => {
     const merged = mergeRequestAndRoute(request, routes);
-    const route = matchExactRoute(merged);
-    if (route === undefined) {
-        return matchWildcardRoute(merged);
+    const exactRoute = matchExactRoute(merged);
+    if (exactRoute === undefined) {
+        const variableRoute = matchVariablePathRoute(merged);
+        if (variableRoute === undefined) {
+            return matchWildcardRoute(merged);
+        } else {
+            return variableRoute;
+        }
+    } else {
+        return exactRoute;
     }
-    return route;
 };
 
 const writeNotFoundToSocket = (socket: net.Socket) => {
@@ -389,19 +501,24 @@ const writeNotFoundToSocket = (socket: net.Socket) => {
 
 const handleNewConnection = (socket: net.Socket, routes: Route[]) => {
     socket.on("data", (buffer) => {
-        const request = parseRequest(buffer.toString("utf8"));
-        if (request) {
-            const route = matchRoute(request, routes);
-            if (route) {
-                route[1].action(socket, request);
+        try {
+            const request = parseRequest(buffer.toString("utf8"));
+            if (request) {
+                const route = matchRoute(request, routes);
+                if (route) {
+                    const [nRequest, nRoute] = route;
+                    nRoute.action(socket, nRequest);
+                } else {
+                    writeNotFoundToSocket(socket);
+                }
             } else {
                 writeNotFoundToSocket(socket);
             }
-        } else {
-            writeNotFoundToSocket(socket);
+            socket.pipe(socket);
+            socket.end();
+        } catch (e) {
+            console.error(e);
         }
-        socket.pipe(socket);
-        socket.end();
     });
 };
 
@@ -417,10 +534,10 @@ const route = (
     };
 };
 
-const createServer = (port: number, ...routes: Route[]) => {
+const createServer = (hostname: string, port: number, ...routes: Route[]) => {
     new net.Server()
-        .listen(port, "localhost", undefined, () => {
-            console.log(`Server started... on port: ${port}`);
+        .listen(port, hostname, undefined, () => {
+            console.log(`Server started on ${hostname}:${port}.`);
         })
         .on("connection", (socket: net.Socket) => {
             handleNewConnection(socket, routes);
@@ -428,6 +545,7 @@ const createServer = (port: number, ...routes: Route[]) => {
 };
 
 createServer(
+    "0.0.0.0",
     8888,
     route(HTTPMethods.GET, "/", (socket) => {
         compose(
@@ -453,7 +571,7 @@ createServer(
             },
             (socket: net.Socket) => {
                 return [
-                    readFileSync("./index.html", {
+                    readFileSync("./websites/index.html", {
                         encoding: "utf8",
                     }),
                     socket,
@@ -501,18 +619,37 @@ createServer(
             },
             ([socket, request]: [net.Socket, Request | undefined]) => {
                 return [
-                    request !== undefined ? tryReadFile(request) : undefined,
+                    request !== undefined
+                        ? tryReadFile(request, "/websites")
+                        : undefined,
                     socket,
                 ];
             }
         )([socket, request]);
     }),
-    route(HTTPMethods.POST, "/", (socket, request) => {
-        if (request) {
-            console.log("Payload:", request.payload);
+    route(
+        HTTPMethods.GET,
+        "/test/{variable}/other/{other}",
+        (socket, request) => {
+            const jsonValue = JSON.stringify(request?.pathVariables);
+            compose(
+                ([socket, response]: [net.Socket, any]) => {
+                    socket.write(response);
+                },
+                ([socket, jsonValue]: [net.Socket, string]) => {
+                    return [
+                        socket,
+                        makeResponse(
+                            STATUSCODES.OK,
+                            [
+                                ["Content-Lenght", jsonValue.length.toString()],
+                                ["Content-Type", "application/json"],
+                            ],
+                            jsonValue
+                        ),
+                    ];
+                }
+            )([socket, jsonValue]);
         }
-        socket.write(
-            "HTTP/1.1 200 Ok\r\nServer: DP_PROJEKT\r\nContent-Type: text/html\r\nContent-Length: 25\r\n\r\n<html>Hello World!</html>"
-        );
-    })
+    )
 );
