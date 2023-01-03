@@ -11,6 +11,7 @@ type Request = {
     payload: any;
     queryString: QueryStrings | undefined;
     pathVariables?: Record<string, string>;
+    pathSegments?: string[];
 };
 
 type StatusCode = {
@@ -22,6 +23,7 @@ type Route = {
     method: string;
     path: string;
     action: (socket: net.Socket, request: Request) => void;
+    pathSegments?: (string | undefined)[];
 };
 
 type FileContents = {
@@ -272,18 +274,24 @@ const normalizeURI = (uri: string): string => {
     return compose(removeDots, removeWhitespace, decodeURI)(uri);
 };
 
-const extractQueryStrings = (uri: string) => {
+const extractQueryStrings = (
+    uri: string
+): [string, QueryStrings | undefined] => {
     const lastUriSegment = uri.slice(uri.lastIndexOf("/") + 1);
     if (lastUriSegment.includes("?")) {
-        return lastUriSegment
-            .slice(lastUriSegment.indexOf("?") + 1)
-            .split("&")
-            .reduce((queryString: QueryStrings, value) => {
-                const [field, val] = value.split("=");
-                return { ...queryString, [field]: val };
-            }, {});
+        return [
+            uri.slice(0, uri.indexOf("?")),
+            lastUriSegment
+                .slice(lastUriSegment.indexOf("?") + 1)
+                .split("&")
+                .reduce((queryString: QueryStrings, value) => {
+                    const [field, val] = value.split("=");
+                    return { ...queryString, [field]: val };
+                }, {}),
+        ];
     } else {
-        return undefined;
+        const pair: [string, undefined] = [uri, undefined];
+        return pair;
     }
 };
 
@@ -340,6 +348,7 @@ const parseRequest = (data: string): Request | undefined => {
         .slice(0, 3)
         .map((val) => val);
     const headers = parseHeaders(data);
+    const [queryFreeUri, queryStrings] = extractQueryStrings(normalizeURI(uri));
     switch (method.toLowerCase()) {
         case HTTPMethods.GET:
         case HTTPMethods.HEAD:
@@ -350,21 +359,21 @@ const parseRequest = (data: string): Request | undefined => {
         case HTTPMethods.PATCH:
             return {
                 method: method.toLowerCase(),
-                path: normalizeURI(uri),
+                path: queryFreeUri,
                 protocolVersion,
                 headers,
                 payload: undefined,
-                queryString: extractQueryStrings(uri),
+                queryString: queryStrings,
             };
         case HTTPMethods.POST:
         case HTTPMethods.PUT:
             return {
                 method: method.toLowerCase(),
-                path: normalizeURI(uri),
+                path: queryFreeUri,
                 protocolVersion,
                 headers,
                 payload: getPayload(headers, data),
-                queryString: extractQueryStrings(uri),
+                queryString: queryStrings,
             };
         default:
             return undefined;
@@ -429,25 +438,43 @@ const matchWildcardRoute = (merged: [Request, Route][]) => {
 };
 
 const matchVariablePathRoute = (merged: [Request, Route][]) => {
-    return merged.reduce(
-        (variablePathRoutes: [Request, Route][], [request, route]) => {
-            const variableSegments = route.path
+    return merged
+        .reduce((variablePathRoutes: [Request, Route][], [request, route]) => {
+            const [variableSegments, pathSegment] = route.path
                 .split("/")
-                .reduce((variableSegments: (string | undefined)[], segment) => {
-                    const openingBracketIdx = segment.indexOf("{");
-                    const closingBrackedIdx = segment.indexOf("}");
-                    if (openingBracketIdx !== -1 && closingBrackedIdx !== -1) {
-                        return [
-                            ...variableSegments,
-                            segment.slice(
-                                openingBracketIdx + 1,
-                                closingBrackedIdx
-                            ),
-                        ];
-                    } else {
-                        return [...variableSegments, undefined];
-                    }
-                }, []);
+                .reduce(
+                    (
+                        [variableSegments, pathSegments]: [
+                            (string | undefined)[],
+                            (string | undefined)[]
+                        ],
+                        segment
+                    ) => {
+                        const openingBracketIdx = segment.indexOf("{");
+                        const closingBrackedIdx = segment.indexOf("}");
+                        if (
+                            openingBracketIdx !== -1 &&
+                            closingBrackedIdx !== -1
+                        ) {
+                            return [
+                                [
+                                    ...variableSegments,
+                                    segment.slice(
+                                        openingBracketIdx + 1,
+                                        closingBrackedIdx
+                                    ),
+                                ],
+                                [...pathSegments, undefined],
+                            ];
+                        } else {
+                            return [
+                                [...variableSegments, undefined],
+                                [...pathSegments, segment],
+                            ];
+                        }
+                    },
+                    [[], []]
+                );
             const requestSegments = request.path
                 .split("/")
                 .reduce(
@@ -471,21 +498,45 @@ const matchVariablePathRoute = (merged: [Request, Route][]) => {
                     },
                     {}
                 );
-                const requestWithPathVariables: Request = {
-                    ...request,
-                    pathVariables: variables,
-                };
                 const pair: [Request, Route] = [
-                    requestWithPathVariables,
-                    route,
+                    {
+                        ...request,
+                        pathVariables: variables,
+                        pathSegments: requestSegments,
+                    },
+                    { ...route, pathSegments: pathSegment },
                 ];
                 return [...variablePathRoutes, pair];
             } else {
                 return [...variablePathRoutes];
             }
-        },
-        []
-    )[0];
+        }, [])
+        .find(([request, route]) => {
+            if (request.pathSegments && route.pathSegments) {
+                const pairs = pairArrayElements(
+                    request.pathSegments,
+                    route.pathSegments
+                );
+                return pairs.reduce(
+                    (validMatch, [reqSegment, routeSegment]) => {
+                        if (!validMatch) {
+                            return false;
+                        }
+                        if (routeSegment === undefined) {
+                            return validMatch;
+                        }
+                        if (reqSegment === routeSegment) {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    },
+                    true
+                );
+            } else {
+                return false;
+            }
+        });
 };
 
 const matchRoute = (request: Request, routes: Route[]) => {
@@ -587,7 +638,7 @@ createServer(
             }
         )(socket);
     }),
-    route(HTTPMethods.GET, "/*", (socket, request) => {
+    route(HTTPMethods.GET, "/websites/*", (socket, request) => {
         compose(
             ([fileContents, socket]: [string, net.Socket]) => {
                 compose(
@@ -627,37 +678,52 @@ createServer(
             },
             ([socket, request]: [net.Socket, Request | undefined]) => {
                 return [
-                    request !== undefined
-                        ? tryReadFile(request, "/websites")
-                        : undefined,
+                    request !== undefined ? tryReadFile(request) : undefined,
                     socket,
                 ];
             }
         )([socket, request]);
     }),
-    route(
-        HTTPMethods.GET,
-        "/test/{variable}/other/{other}",
-        (socket, request) => {
-            const jsonValue = JSON.stringify(request?.pathVariables);
-            compose(
-                ([socket, response]: [net.Socket, any]) => {
-                    socket.write(response);
-                },
-                ([socket, jsonValue]: [net.Socket, string]) => {
-                    return [
-                        socket,
-                        makeResponse(
-                            STATUSCODES.OK,
-                            [
-                                ["Content-Lenght", jsonValue.length.toString()],
-                                ["Content-Type", "application/json"],
-                            ],
-                            jsonValue
-                        ),
-                    ];
-                }
-            )([socket, jsonValue]);
-        }
-    )
+    route(HTTPMethods.GET, "/demo/{variable}/path/{uri}", (socket, request) => {
+        const jsonValue = JSON.stringify(request?.pathVariables);
+        compose(
+            ([socket, response]: [net.Socket, any]) => {
+                socket.write(response);
+            },
+            ([socket, jsonValue]: [net.Socket, string]) => {
+                return [
+                    socket,
+                    makeResponse(
+                        STATUSCODES.OK,
+                        [
+                            ["Content-Lenght", jsonValue.length.toString()],
+                            ["Content-Type", "application/json"],
+                        ],
+                        jsonValue
+                    ),
+                ];
+            }
+        )([socket, jsonValue]);
+    }),
+    route(HTTPMethods.GET, "/query", (socket, request) => {
+        const jsonValue = JSON.stringify(request?.queryString);
+        compose(
+            ([socket, response]: [net.Socket, any]) => {
+                socket.write(response);
+            },
+            ([socket, jsonValue]: [net.Socket, string]) => {
+                return [
+                    socket,
+                    makeResponse(
+                        STATUSCODES.OK,
+                        [
+                            ["Content-Lenght", jsonValue.length.toString()],
+                            ["Content-Type", "application/json"],
+                        ],
+                        jsonValue
+                    ),
+                ];
+            }
+        )([socket, jsonValue]);
+    })
 );
