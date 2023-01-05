@@ -83,8 +83,8 @@ potrebno poštivati slijedeća svojstva \cite{rovzic2016lambda}:
 	      veliki izvor greška u programu i čini redoslijed izvršavanja nebitnim jer ne postoje popratne
 	      posljedice te funkcija može biti evaluirana u bilo kojem trenutku \cite{hughes1989functional}.
 	\item Funkcije prvog i višeg reda; Funkcije su tretirane kao objekti prvog reda tj. mogu biti rekurzivne,
-        višeg reda, polimorfne \cite{10.1145/72551.72554}. Funkcije višeg reda mogu primati kao argumente
-        druge funkcije te mogu vraćati funkcije kao povratne vrijednosti.
+	      višeg reda, polimorfne \cite{10.1145/72551.72554}. Funkcije višeg reda mogu primati kao argumente
+	      druge funkcije te mogu vraćati funkcije kao povratne vrijednosti.
 \end{itemize}
 
 \chapter{Web poslužitelj}
@@ -92,204 +92,215 @@ potrebno poštivati slijedeća svojstva \cite{rovzic2016lambda}:
 Web poslužitelj u svojem najosnovnijem obliku isoporučuje klijentima zatražene dokumente preko weba.
 Web se sastoji od tri glavne komponente \cite{yeager1996web}:
 \begin{enumerate}
-    \item Sistem adresa, URL-a (engl. Universal Resource Locators); Putanje koje omogućuju korisnicima
-        dohvaćanje gotovo bilo koju vrstu informacija s gotovo bilo kojeg mjesta na internetu
-    \item HTTP (engl. HyperText Transfer Protocol); Najčešće korišteni protokol za komunikaciju između
-        klijenta i poslužitelja putem weba. Zbog svoje relativne jednostavnosti omogućuje mongim programima
-        zajednički rad.
-    \item HTML (engl. HyperText Markup Language); Najčešće posluživana vrsta dokumenta na webu te je može
-        koristiti svaki web preglednik.
+	\item Sistem adresa, URL-a (engl. Universal Resource Locators); Putanje koje omogućuju korisnicima
+	      dohvaćanje gotovo bilo koju vrstu informacija s gotovo bilo kojeg mjesta na internetu
+	\item HTTP (engl. HyperText Transfer Protocol); Najčešće korišteni protokol za komunikaciju između
+	      klijenta i poslužitelja putem weba. Zbog svoje relativne jednostavnosti omogućuje mongim programima
+	      zajednički rad.
+	\item HTML (engl. HyperText Markup Language); Najčešće posluživana vrsta dokumenta na webu te je može
+	      koristiti svaki web preglednik.
 \end{enumerate}
 
 Web poslužitelj s klijentima komunicira razmjenom poruka. Uspostavom veze između poslužitelja i klijenta,
 klijent može poslati zahtjev poslužitelju. U slučaju HTTP-a klijent šalje zahtjev s određenom metodom,
 ovisno o metodi šalje samo zaglavlje ili zaglavlje i tijelo poruke. HTTP zaglavlja su u tekstualnom obliku.
-Poslužitelj, kod primanja zaglavlja, interpretira klijentov zahtijev i pokušava ispuniti zahtijev. Ovisno o
-uspjehu ispunjenja zahtijeva poslužitelj šalje povratnu informaciju klijentu, povratna informacija se sastoji
+Poslužitelj, kod primanja zaglavlja, interpretira klijentov zahtjev i pokušava ispuniti zahtjev. Ovisno o
+uspjehu ispunjenja zahtjeva poslužitelj šalje povratnu informaciju klijentu, povratna informacija se sastoji
 od HTTP zaglavlja i ovisno o zahtijevu, neke HTML datoteke, teksta, slike, strukturiranih podataka.
 
-\chapter{Opis implementacije}
+\section{Primjer HTTP zahtjeva i odgovora}
 
-\section{Poglavlje druge razine}
+Slijedeće predstavlja jednostavni HTTP zahtjev poslan s klijenta na poslužitelj:
+\begin{verbatim}
+GET /index.html HTTP/1.1
+Accept: text/html,application/xml,image/webp,image/apng,*/*
+User-Agent: Mozilla/5.0  Gecko/20100101 Firefox/108.0
+\end{verbatim}
 
-\subsection{Poglavlje treće razine}
+HTTP zahtjev počinje u prvoj liniji s metodom koju slijedi URL putanja te HTTP verzija, u ovom slučaju verzija 1.1.
+Druga linija ukazuje kakve vrste dokumenata i podataka je klijent spreman primiti. U primjeru klijent eksplicitno ukazuje da
+može primiti html, xml, webp ili bilo koju drugu vrstu datoteke na što ukazuje */* dio.
+Zadnja linija identificira tip preglednika s kojega je poslan zahtjev.
 
-\subsubsection{Poglavlje četvrte razine}
+Poslužitelj za zahtjev kreira odgovor. Odgovor uvijek u prvoj liniji sadrži status odgovora tj.
+je li zahtjev uspio ili je odbijen. Slijedeće sadrži informacije o odgovoru, to su slično kao
+kod zahtjeva, informacije o stvarnim zahtjevanim podacima, informacije o poslužitelju,
+vrstu podattaka koji se šalju. Zadnji dio odgovora je dokument ili podatci koje je klijent
+zatražio. Slijedeće je primjer odgovora na prije postavljeni zahtjev:
+\begin{verbatim}
+HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Lenght: 40
 
-\chapter{Tehničke upute}
+<html>
+<h1>Hello World!</h1>
+</html>
+\end{verbatim}
+Prva linija odgovora je status odgovora, odgovor na zahtjev je uspješan što se može vidjeti iz
+numeričke reprezentacije statusa 200 ili iz OK. Druga linija opisuje tip dokumenta koji je poslan
+u odgovoru. U ovom slučaju je to html dokument, duljine 40 bajta. Prazna linija je odijeljak
+zaglavlja odgovora i tijela odgovora. Ispod prazne linije nalazi se tijelo odgovora. Tijelo može
+biti u tekstualnom ili binarnom obliku i u odgovorima sa tijelom se uvijek nalazi iza odijeljka.
 
-\section{Upute za oblikovanje izgleda rada}
+\chapter{Implementacija web poslužitelja}
 
-\textbf{Stranice} se oblikuju korištenjem sljedećih parametara:
-\begin{itemize}
-	\item veličina i oblik papira je A4, okomito usmjerenje, margine 2,5 cm na svakoj strani;
+\section{Odabrani programski jezik i upute za pokretanje}
+Web poslužitelj je implementiran u typescriptu, zbog lakšeg definiranje tipova podataka
+i razumijevanja koda. Typescript je sintaktički nadskup javascript-a i potrebno ga je
+konvertirati u javascript tj. transpilirati.
 
-	\item naslovna stranica rada se ne numerira;
+Za kompajliranje i pokretanje web poslužitelja potrebni su NodeJS, npm (node package manager) i typescript.
+Ako su NodeJS i npm instalirani typescript se može globalno instalirati pokretanjem \texttt{npm install -g typescript}
+u terminalu. Za pokretanje projekta potrebno se je postaviti u direktorij s datotekama \texttt{package.json} i
+\texttt{tsconfig.json}. U tom direktoriju prvo pokrenuti \texttt{npm install} da npm pribavi potrebne pakete
+za pokretanje programa (Program jedino zavisi o paketu \texttt{@types/node} koji sadrži NodeJS tipove za typescript).
+Nakon pribavljanja paketa potrebno je transpilirati program što se odrađuje pokretanjem \texttt{tsc}, završetkom
+transpilacije web poslužitelj se može pokrenuti s \texttt{node src/main.js}. Web poslužitelj se pokreće na
+adresi \texttt{0.0.0.0:8888} ili \texttt{localhost:8888}.
 
-	\item nakon naslovne stranice, sve sljedeće stranice do 1. Poglavlja se numeriraju rimskim brojevima, počevši od i;
+\section{Implementacija}
 
-	\item od 1. poglavlja nadalje, stranice se numeriraju arapskim brojevima;
+Poslužitelj je implementiran poštivanjem funkcijskog pristupa, no neke funkcije nistu
+potpuno "čiste" pošto moraju pisati na mrežu ili čitati sa diska. Slijedeća funkcija
+pokreće web poslužitelj:
+\begin{lstlisting}[caption={Funkcija za pokretanje web poslužitelja}, label=lst:pokretanje]
+const createServer = (hostname: string, port: number, ...routes: Route[]) => {
+    new net.Server()
+        .listen(port, hostname, undefined, () => {
+            console.log(`Server started on ${hostname}:${port}.`);
+        })
+        .on("connection", (socket: net.Socket) => {
+            handleNewConnection(socket, routes);
+        });
+};
+\end{lstlisting}
+Funkcija kao ulaz prima hostname i port na kojemu se kreira server te varijabilni broj
+ruta tj. putanja na kojima će pokušati odgovoriti na zahtjev klijenta. Metoda listen()
+registrira server na unesenim hostname-u i portu, a metoda on() registrira događaj (event)
+connection što poziva funkciju kad događaj okine.
 
-	\item broj stranice treba pozicionirati desno 1,25 cm od dna stranice, font Arial 9.
-\end{itemize}
-
-\textbf{Tekst} rada je potrebno oblikovati sukladno ovom predlošku, odnosno na sljedeći način:
-\begin{itemize}
-	\item u pisanju teksta koristite font Arial 11 pt, s proredom 1,5 te razmakom 0 pt prije i razmakom 6 pt poslije odlomka, pri čemu je prvi redak uvučen za 1,25 cm;
-
-	\item u naslovima prve razine „3. Razrada teme“ koristite font Arial 18 pt, podebljano, prijelom stranice (svaki naslov prve razine treba biti na novoj stranici), s proredom 1,5 te razmakom 0 pt prije i razmakom 18 pt poslije odlomka;
-
-	\item u naslovima druge razine „2.1. Naslov“ koristite font Arial 16 pt, podebljano, s proredom 1,5 te razmakom 18 pt prije i razmakom 12 pt poslije odlomka;
-
-	\item u naslovima treće razine „2.1.1. Naslov“ koristite font Arial 14 pt, podebljano, s proredom 1,5 te razmakom 12 pt prije i razmakom 6 pt poslije odlomka;
-
-	\item u naslovima četvrte razine „2.1.1.1. Naslov“ koristite font Arial 12 pt, podebljano, s proredom 1,5 te razmakom 6 pt prije i razmakom 6 pt poslije odlomka;
-
-	\item ostalo značajno isticanje cjelina rada može biti istaknuto podebljanim i kurziv slovima, korištenjem fonta Arial 11 pt.
-\end{itemize}
-
-
-\textbf{Slike} u radu je potrebno oblikovati na sljedeći način:
-
-\begin{itemize}
-	\item naziv slike navedite ispod slike uz numeraciju;
-
-	\item za nazive slika koristite iste postavke fonta kao i za tekst, ali stavite naziv slike u centrirani položaj;
-
-	\item za oblikovanje same slike koristite font Arial 9 pt za tekst na slici;
-	      ispred same slike umetnite jedan prazan redak (osim ako je slika pozicionirana na početku stranice);
-
-	\item nakon naziva slike ostavite jedan redak prazan (osim ako je naziv slike zadnji redak na stranici);
-
-	\item kod prijeloma stranice treba obratiti posebnu pozornost da naziv slike, izvor i sama slika moraju biti na istoj stranici;
-
-	\item slike je potrebno numerirati redom pojavljivanja u tekstu;
-
-	\item ako je slika preuzeta iz drugog izvora, nakon navođenja naziva slike u zagradi navedite izvor, npr. (autor/autorica, godina);
-
-	\item dozvoljeno je napraviti vlastitu preradu slika, grafikona ili tablica na način da se zadrži isti smisao sadržaja, ali promijeni izgled. I u takvim se slučajevima obavezno u nazivu navodi referenca izvornog djela ovako: ; prema [X]
-
-	\item dozvoljeno je preuzeti samo jednu sliku, grafikon ili tablicu u izvornom obliku iz istog izvora. Za doslovno preuzimanje većeg dijela sadržaja potrebno je ishoditi dozvolu nositelja autorskih prava;
-
-	\item primjer označavanja slike možete vidjeti u nastavku (slika \ref{fig:podjela}).
-\end{itemize}
-
-\begin{figure}[]
-	\centering
-	\includegraphics[width=0.9\textwidth]{slike/slika.png}
-	\caption{Podjela investicijskih fondova; preuzeto iz \cite{Russell2010AImodern}}
-	\label{fig:podjela}
-\end{figure}
-
-\textbf{Tablice} rada je potrebno oblikovati sukladno ovim uputama:
-\begin{itemize}
-	\item naziv tablice navedite iznad slike;
-
-	\item za nazive tablica koristite iste postavke fonta kao i za tekst, ali stavite naziv tablice u centrirani položaj;
-
-	\item za oblikovanje same tablice koristite font Arial 9 pt za tekst u tablici;
-
-	\item tablice numerirajte redom pojavljivanja u tekstu;
-
-	\item prije naziva tablice umetnite jedan redak prazan (osim ako je naziv tablice prvi redak na stranici);
-
-	\item nakon same tablice umetnite jedan prazan redak (osim ako je tablica pozicionirana na kraju stranice);
-
-	\item kod prijeloma stranice treba obratiti posebnu pozornost da naziv tablice, izvor i sama tablica moraju biti na istoj stranici;
-
-	\item ako je tablica preuzeta iz drugog izvora, nakon navođenja naziva tablice potrebno je navesti izvor, na isti način kako je opisano kod slika;
-
-	\item primjer označavanja tablice možete vidjeti u nastavku (tablica \ref{tab:objekti}).
-\end{itemize}
-
-\begin{table}[h!]
-	\centering
-	\caption{Prikaz podataka o učestalosti pojavljivanja objekta; prema \cite{wooldridge2009IntroductionMultiAgentSystems}}
-	\begin{tabularx}{0.66\textwidth}{|X|X|X|X|}
-		\hline
-		\cellcolor{gray!25} & \cellcolor{gray!25} & \cellcolor{gray!25} & \cellcolor{gray!25} \\
-		\hline
-		                    &                     &                     &                     \\
-		\hline
-		                    &                     &                     &                     \\
-		\hline
-	\end{tabularx}
-	\\[10pt]
-	\label{tab:objekti}
-\end{table}
-
-\textbf{Programski kod}
-\begin{itemize}
-	\item za oblikovanje teksta koji je programski kôd koristite font Courier, veličine 10 pt, jednostruki prored, 6 pt iza odlomka, npr. HTML kôd dijela zaglavlja početne web stranice FOI weba je prikazan kao isječak koda \ref{lst:prviPrimjer}. U slučaju preuzetog programskog koda, za isti je nužno potrebno naznačiti izvor, kao u isječku koda \ref{lst:kod2}. Ponekad palatali mogu stvarati probleme u opisima isječaka koda, pa ih je potrebno zamijeniti \LaTeX\ kodovima: \v{c}/\v{s}/\v{z}: \lstinline+\v{c/s/z}+, \'{c}: \lstinline+\'{c}+, \dj: \lstinline+\dj+.
-\end{itemize}
-
-\begin{lstlisting}[language=HTML, caption={Primjer zapisa isječka programskog kôda}, label=lst:prviPrimjer]
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <link rel="shortcut icon" href="https://www.foi.unizg.hr/sites/default/files/favicon_0_1.ico" type="image/vnd.microsoft.icon" />
-  <meta name="generator" content="Drupal 7 (http://drupal.org)" />
-  <link rel="canonical" href="https://www.foi.unizg.hr/hr" />
-  <link rel="shortlink" href="https://www.foi.unizg.hr/hr" />
-  <!-- Set the viewport width to device width for mobile -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dobro %*došli*) na FOI | FOI</title>...
-</head>
+Kod kreiranja poslužitelja potrebno je definirati na koje putanje će pokušati nešto izvršiti
+te dati prikladan odgovor na zahtjev. Za sve putanje koje nisu definirane poslužitelj odgovara
+sa 404 NOT FOUND. Ruta je definirana metodom koju očekuje (GET, POST), putanjom koju očekuje
+i funkcijom koja će se izvršiti kod odgovaranja na zahtjev.
+\begin{lstlisting}[caption={Definicija rute}, label=lst:ruta]
+const route = (
+    method: string,
+    path: string,
+    action: (socket: net.Socket, request: Request | undefined) => void
+): Route => {
+    return {
+        method,
+        path,
+        action,
+    };
+};
 \end{lstlisting}
 
-\begin{lstlisting}[language=Python, caption={
-[Ovo je primjer koda koji je preuzet]
-Ovo je primjer koda koji je preuzet iz \cite[str. 23]{Russell2010AImodern}}, label=lst:kod2]
-print("Ovo je preuzeti dio koda")
+Ovu funkciju poziva poslužitelj kod prihvaćanja nove veze i primanja zahtjeva od
+klijenta. Funkcija nije čista jer koristi try, catch mehanizam, no u ovom slučaju
+je potrebno jer inače kod greške na socketu bi se poslužitelj srušio. Funkcija nakon
+primanja HTTP zahtjeva parsira zahtjev u strukturu pogodnu za program. Nakon toga pokuša
+odrediti ako ruta odgovara nekoj od zadanih i ako pripada poziva funkciju koja generira
+odgovarajući odgovor na zahtjev.
+\begin{lstlisting}[caption={Prihvaćanje nove veze i zahtjeva}, label=lst:conn]
+const handleNewConnection = (socket: net.Socket, routes: Route[]) => {
+    socket.on("data", (buffer) => {
+        try {
+            const request = parseRequest(buffer.toString("utf8"));
+            if (request) {
+                const route = matchRoute(request, routes);
+                if (route) {
+                    const [nRequest, nRoute] = route;
+                    nRoute.action(socket, nRequest);
+                } else {
+                    writeNotFoundToSocket(socket);
+                }
+            } else {
+                writeNotFoundToSocket(socket);
+            }
+            socket.pipe(socket).end();
+        } catch (e) {
+            console.error(e);
+        }
+    });
+};
 \end{lstlisting}
 
-\textbf{Formule}
-\begin{itemize}
-	\item za unos formula koristite editor za formule. Matematičke izraze moguće je pisati unutar teksta $E = mc^2$ ili izdvojeno:
+\subsection{Rute} \
+Web poslužitelj podržava tri vrste ruta.
+\begin{enumerate}
+	\item Puno definirane rute (/path/to/index.html);
+	\item Wildcard rute (/path/to/*). Kod ove vrste ruta sve putanje nakon znaka \texttt{*}
+	      su validne i poslužitelj će ih pokušati poslužiti
+	\item Rute s varijabilnom putanjom (/path/\{to\}/\{resource\}). Ovakav tip ruta je koristan
+	      pošto se vrijednosti u zagradama \texttt{varijabla} tretiraju kao varijable.
+	      Primjer može biti pregled određenog zapisa u bazi podataka prema nekom identifikatoru
+	      (GET /user/\{id\}).
+\end{enumerate}
+Web poslužitelj također ima mogućnost čitanja (samo na zadnjem dijelu putanje) niz upita (query
+string). Niz upita nije posebno definiran kod kreiranja rute, već svaka ruta parsira
+niz upita, ako postoji, te ga je moguće koristiti po potrebi.
 
-	      $$
-		      a^2 + b^2 = c^2
-	      $$
+Ova funkcija se prosljeđuje kao argument u \texttt{createServer} funkciju kako bi se
+registrirala nova ruta na poslužitelju. Poslužitelj će na GET metodu koja ima putanju
+\texttt{/} ili praznu putanju generirati odgovor čitanjem datoteke \texttt{index.html},
+kreirati će odgovarajuće zaglavlje i u tijelo HTTP odgovora će dodati sadržaj pročitane
+datoteke. Sljedeći isječak koda je primjer definiranje rute, sve rute su definirane u
+poglavlju \ref{sec:rute}.
+\begin{lstlisting}[caption={Primjer rute}, label=lst:primjer_rute]
+route(HTTPMethods.GET, "/", (socket) => {
+    compose(
+        ([file, socket]: [string, net.Socket]) => {
+            compose(
+                ([response, socket]: [string, net.Socket]) => {
+                    socket.write(response);
+                },
+                ([file, socket]: [string, net.Socket]) => {
+                    return [
+                        makeResponse(
+                            STATUSCODES.OK,
+                            [
+                                ["Content-Lenght", file.length.toString()],
+                                ["Content-Type", "text/html"],
+                            ],
+                            file
+                        ),
+                        socket,
+                    ];
+                }
+            )([file, socket]);
+        },
+        (socket: net.Socket) => {
+            return [
+                readFileSync("./websites/index.html", {
+                    encoding: "utf8",
+                }),
+                socket,
+            ];
+        }
+    )(socket);
+}),
+\end{lstlisting}
+
+\subsection{Definirane rute} \label{sec:rute}
+
+Lista ruta na koje će trenutna implementacija web servera dati odgovore.
+Rute su zapisane u obliku \texttt{METODA} \texttt{/PUTANJA} - objašnjenje.
+\begin{itemize}
+	\item \texttt{GET} \texttt{/} - Poslužuje index.html dokument koji ima primjere
+	      za ostale putanje.
+	\item \texttt{GET} \texttt{/websites/*} - Poslužuje sve putanje koje počinju sa /websites
+	\item \texttt{GET} \texttt{/demo/\{variable\}/path/\{uri\}} - Primjer varijabilne putanje.
+	      Vraća JSON objekt koji kao ključeve ima variable i uri, a vrijednosti će odgovarati
+	      vrijednostima koje će biti napisane na mijestu variable i uri u putanje. Odlazak na
+	      putanju /demo/changeme/path/value će vratiti ovakav JSON objekt: \{"variable": "changeme", "uri": "value"\}.
+	\item \texttt{GET} \texttt{/query} - Putanja za prikaz rada niza upita. Na kraj putanje može
+	      se dodati upit tipa \texttt{?field=value\&anotherField=anotherValue}, te će poslužitelj
+	      vratiti JSON objekt s unesenim upitom tj. upitima ako ih je više.
 \end{itemize}
 
-\textbf{Kratice}
-\begin{itemize}
-	\item ako želite koristiti kratice pojmova u tekstu, kad prvi put spominjete pojam potrebno je navesti puni naziv, a kraticu navesti u zagradi: informacijske i komunikacijske tehnologije (IKT). Nakon toga možete koristiti kratice u tekstu. Poželjno je u naslovima koristiti pune nazive.
-\end{itemize}
-
-\textbf{Strano nazivlje}
-\begin{itemize}
-	\item strano nazivlje se u tekstu navodi u zagradi, napisano \textit{kurzivom}, nakon hrvatskog izraza, npr. analiza društvene mreže (engl. \textit{Social Network Analysis - SNA}).
-\end{itemize}
-
-
-
-\section{Navođenje literature}
-
-Za navođenje literature u radu koristite \textbf{IEEE} stil. Važno je dosljedno primjenjivati odabrani stil u cijelom radu.
-
-U popisu literature potrebno je navesti svu literaturu i samo literaturu koju ste koristili u tekstu.
-
-Uz svaku preuzetu tvrdnju potrebno je navesti njezin izvor, tj. referencu. Reference se u tekstu navode tako da se uz citirani tekst navede izvor, sukladno načinu propisanom odabranim stilom i FOI preporukama za citiranje i referenciranje \cite{sveucilisteuzagrebufakultetorganizacijeiinformatike2017FOIPreporukeCitiranja}. Prilikom referenciranja knjiga, uvijek je potrebno navoditi i broj ili brojeve stranica.
-
-Za citate i njihovo referenciranje koristite naredbu \lstinline+\blockquote+ kako slijedi. Citat će se automatski oblikovati kako je potrebno, ovisno o duljini citata. U kratkom citatu je pojašnjeno da bi se hibridna platforma za orkestraciju mogla u domeni videoigara koristiti
-\blockquote[{\cite[str. 5]{schatten2020PlatformeZaOrkestraciju}}]{za implementaciju većeg broja inteligentnijih, a samim
-	time i interesantnijih, suparnika.} Ono što slijedi nakon obavezno navedenog broja stranice uz izvor citata je primjer duljeg citata.
-
-\blockquote[{\cite[str. 6]{schatten2020PlatformeZaOrkestraciju}}]{Iako je testiranje performansi MMO igara dobro implementirano na brojnim platformama, testiranje iskustva
-	igranja (posebno u primjerice MMORPG igrama) velikog razmjera postaje iznimno složen zadatak, kao što
-	je okvirno predstavljeno u (Schatten, Okreša Ðurić, Tomičić i Ivkovič, 2017). Ne samo da je potrebno testirati
-	razne logičke zagonetke i zadatke koje igrač mora riješiti kako bi napredovao u igri, već i pojavljujuću interakciju među igračima koja bi mogla u potpunosti promijeniti rezultat igre. Korištenjem distribuirane platforme za orkestraciju bilo bi moguće dodavanje automatiziranih igrača po volji instanciranjem novih agenata. Štoviše, rezultati testiranja mogli bit biti dodatno
-	analizirani dodavanjem agenata za analizu ili izvještavanje.}
-
-Podaci o svim bibliografskim jedinicama nalaze se u \lstinline+lib.bib+ datoteci u \lstinline+BibLaTeX+ formatu. Bibliografske jedinice korištene u ovom dokumentu su:
-\begin{itemize}
-	\item knjige \cite{Russell2010AImodern,wooldridge2009IntroductionMultiAgentSystems,oraictolic2011AkademskoPismoStrategije},
-	\item članak s konferencije \cite{okresaduric2019ModellingFormingTemporary},
-	\item članci iz časopisa \cite{SchattenEtAl2016roadmap,rincon2017InfluencingPeopleSocial},
-	\item web-stranica \cite{copeland2020ArtificialIntelligence}.
-\end{itemize}
-
-
+\section{Prikaz rada}
 
 \chapter{Zaključak}
 
@@ -301,5 +312,4 @@ Ovdje treba sažeto rezimirati najvažnije rezultate razrade teme rada. Potrebno
 % generira popis korištene literature, popis slika (ako je primjenjivo), popis tablica (ako je primjenjivo) i popis isječaka koda (ako je primjenjivo)
 
 \appendices % ako nije potrebno, obrisati ili zakomentirati
-
 \end{document}

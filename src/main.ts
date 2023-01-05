@@ -142,9 +142,8 @@ const statusCodeToString = (
     statusCode: StatusCode,
     protocolVersion: string = "HTTP/1.1"
 ) => {
-    return `${protocolVersion} ${statusCode.code.toString()} ${
-        statusCode.response
-    }`;
+    return `${protocolVersion} ${statusCode.code.toString()} ${statusCode.response
+        }`;
 };
 
 const tryGetFileType = (path: string) => {
@@ -573,8 +572,7 @@ const handleNewConnection = (socket: net.Socket, routes: Route[]) => {
             } else {
                 writeNotFoundToSocket(socket);
             }
-            socket.pipe(socket);
-            socket.end();
+            socket.pipe(socket).end();
         } catch (e) {
             console.error(e);
         }
@@ -653,24 +651,24 @@ createServer(
                         return [
                             file !== undefined
                                 ? makeResponse(
-                                      STATUSCODES.OK,
-                                      [
-                                          [
-                                              "Content-Lenght",
-                                              file.fileContents.length.toString(),
-                                          ],
-                                          [
-                                              "Content-Type",
-                                              file.fileContentType,
-                                          ],
-                                      ],
-                                      file.fileContents
-                                  )
+                                    STATUSCODES.OK,
+                                    [
+                                        [
+                                            "Content-Lenght",
+                                            file.fileContents.length.toString(),
+                                        ],
+                                        [
+                                            "Content-Type",
+                                            file.fileContentType,
+                                        ],
+                                    ],
+                                    file.fileContents
+                                )
                                 : makeResponse(
-                                      STATUSCODES.NOT_FOUND,
-                                      [],
-                                      undefined
-                                  ),
+                                    STATUSCODES.NOT_FOUND,
+                                    [],
+                                    undefined
+                                ),
                             socket,
                         ];
                     }
