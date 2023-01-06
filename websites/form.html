@@ -1,0 +1,51 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+</head>
+
+<body>
+    <h1>Form demo</h1>
+    <form id="form">
+        <label>Demo vrijednost:</label>
+        <br>
+        <input type="text" name="demo">
+        <br>
+        <label>Druga vrijednost:</label>
+        <br>
+        <input type="text" name="value2">
+        <br>
+        <br>
+        <input type="submit" value="Submit">
+    </form>
+    <br>
+    <br>
+    <pre id="display-json">
+    </pre>
+    <script>
+        const postForm = async (e) => {
+            e.preventDefault();
+            const response = await fetch("/form", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams(new FormData(form)),
+            });
+            displayJson.innerHTML = JSON.stringify(await response.json(), undefined, 1);
+        }
+
+        const getData = async () => {
+            const response = await fetch("/getData");
+            displayJson.innerHTML = JSON.stringify(await response.json(), undefined, 1);
+        }
+
+        var form = document.getElementById("form");
+        form.addEventListener("submit", postForm);
+
+        var displayJson = document.getElementById("display-json");
+        getData();
+    </script>
+</body>
+
+</html>

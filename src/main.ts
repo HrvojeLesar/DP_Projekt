@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import net from "net";
 
 type RequestHeaders = Record<string, string>;
@@ -225,7 +225,6 @@ const removeDotsRecursive = (uri: string): string[] => {
     if (uri.length === 0) {
         return [];
     }
-
     if (uri.indexOf("../") === 0) {
         // A
         return removeDotsRecursive(uri.replace("../", ""));
@@ -351,11 +350,9 @@ const parseRequest = (data: string): Request | undefined => {
     switch (method.toLowerCase()) {
         case HTTPMethods.GET:
         case HTTPMethods.HEAD:
-        case HTTPMethods.DELETE:
         case HTTPMethods.CONNECT:
         case HTTPMethods.OPTIONS:
         case HTTPMethods.TRACE:
-        case HTTPMethods.PATCH:
             return {
                 method: method.toLowerCase(),
                 path: queryFreeUri,
@@ -364,6 +361,8 @@ const parseRequest = (data: string): Request | undefined => {
                 payload: undefined,
                 queryString: queryStrings,
             };
+        case HTTPMethods.DELETE:
+        case HTTPMethods.PATCH:
         case HTTPMethods.POST:
         case HTTPMethods.PUT:
             return {
@@ -723,5 +722,91 @@ createServer(
                 ];
             }
         )([socket, jsonValue]);
+    }),
+    route(HTTPMethods.GET, "/form", (socket) => {
+        compose(
+            ([socket, response]: [net.Socket, string]) => {
+                socket.write(response);
+            },
+            ([socket, file]: [net.Socket, string]) => {
+                return [
+                    socket,
+                    makeResponse(
+                        STATUSCODES.OK,
+                        [
+                            ["Content-Lenght", file.length.toString()],
+                            ["Content-Type", "text/html"],
+                        ],
+                        file
+                    )
+                ]
+            },
+            (socket: net.Socket) => {
+                return [socket,
+                    readFileSync("./websites/form.html", { encoding: "utf8" })
+                ]
+            }
+        )(socket)
+    }),
+    route(HTTPMethods.GET, "/getData", (socket) => {
+        compose(
+            ([socket, response]: [net.Socket, string]) => {
+                socket.write(response);
+            },
+            ([socket, file]: [net.Socket, string]) => {
+                return [
+                    socket,
+                    makeResponse(
+                        STATUSCODES.OK,
+                        [
+                            ["Content-Lenght", file.length.toString()],
+                            ["Content-Type", "application/json"],
+                        ],
+                        file
+                    )
+                ]
+            },
+            (socket: net.Socket) => {
+                return [socket,
+                    readFileSync("./websites/formdb.json", { encoding: "utf8" })
+                ]
+            }
+        )(socket)
+    }),
+    route(HTTPMethods.POST, "/form", (socket, request) => {
+        compose(
+            ([socket, response]: [net.Socket, string]) => {
+                socket.write(response);
+            },
+            ([socket, data]: [net.Socket, string]) => {
+                return [
+                    socket,
+                    makeResponse(
+                        STATUSCODES.OK,
+                        [
+                            ["Content-Lenght", data.length.toString()],
+                            ["Content-Type", "application/json"],
+                        ],
+                        data
+                    )
+                ]
+            },
+            ([socket, data]: [net.Socket, string]) => {
+                writeFileSync("./websites/formdb.json", data);
+                return [socket, data];
+            },
+            ([socket, request, formDb]: [net.Socket, Request, any]) => {
+                return [
+                    socket,
+                    JSON.stringify({ db: [...formDb.db, request.payload] })
+                ]
+            },
+            ([socket, request]: [net.Socket, Request]) => {
+                return [socket,
+                    request,
+                    JSON.parse(readFileSync("./websites/formdb.json", { encoding: "utf8" })),
+                ]
+            }
+        )([socket, request])
     })
 );
