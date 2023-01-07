@@ -33,3 +33,6 @@ za dohvaćanje datoteka koje se koriste u primjerima.
 
 - Za pokretanje poslužitelja koristi koristi se `node src/main.js` ili `node src/pre-compiled.js`
 ako se želi pokretati priložena .js datoteka.
+
+- Poslužitelj se pokreće na adresi `0.0.0.0:8888`. U web pregledniku se može učitati
+stranica koju poslužuje odlaskom na adresu `localhost:8888`.
