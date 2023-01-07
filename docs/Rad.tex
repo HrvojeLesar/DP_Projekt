@@ -1,46 +1,25 @@
-\documentclass[]{foi} % zakomentirati za pisanje rada na engleskom jeziku
-% \documentclass[english]{foi} % odkomentirati za pisanje rada na engleskom jeziku
+\documentclass[]{foi}
 \usepackage[utf8]{inputenc}
 \usepackage{lipsum}
 
 \vrstaRada{\projekt}
-% \zavrsni ili \diplomski ili \seminar ili \projekt
 
 \title{Implementacija Web poslužitelja korištenjem funkcijskog pristupa}
 \predmet{\predmetDP}
-% ostaviti prazno ako \vrstaRada nije \projekt ili \seminar
-% \predmetBP ili \predmetDP ili \predmetTBP ili \predmetVAS
 
-\author{Hrvoje Lesar} % ime i prezime studenta/studentice
-\spolStudenta{\musko} % \zensko ili \musko
+\author{Hrvoje Lesar}
+\spolStudenta{\musko}
 
-\mentor{Bogdan Okreša Đurić} % ime i prezime mentora
-\spolMentora{\musko} % \zensko ili \musko
+\mentor{Bogdan Okreša Đurić}
+\spolMentora{\musko}
 \titulaProfesora{dr. sc.}
-% HR: dr. sc.  / doc. dr. sc. / izv. prof. dr. sc. / prof. dr. sc. 
-% EN: -prazno- / Asst. Prof.  / Assoc. Prof.       / Full Prof.
 
 \godina{2023}
-\mjesec{Siječanj} % mjesec obrane rada ili projekta
+\mjesec{Siječanj}
 
-\indeks{0016133479} % broj indeksa ili JMBAG
+\indeks{0016133479}
 
 \smjer{Organizacija poslovnih sustava}
-% (ili:
-%     Informacijski sustavi, 
-%     Poslovni sustavi, 
-%     Ekonomika poduzetništva, 
-%     Primjena informacijske tehnologije u poslovanju, 
-%     Informacijsko i programsko inženjerstvo, 
-%     Baze podataka i baze znanja, 
-%     Organizacija poslovnih sustava, 
-%     Informatika u obrazovanju
-% )
-
-
-\sazetak{Opsega od 100 do 300 riječi. Sažetak upućuje na temu rada, ukratko se iznosi čime se rad bavi, teorijsko-metodološka polazišta, glavne teze i smjer rada te zaključci.}
-
-\kljucneRijeci{riječ; riječ; ...riječ; Obuhvaća $7\pm2$ ključna pojma koji su glavni predmet rasprave u radu.}
 
 \begin{document}
 
@@ -52,6 +31,21 @@
 \pagestyle{plain}
 
 \chapter{Uvod}
+
+Projekt je usredotočen na izradu web poslužitelja praćenjem funkcijskog pristupa programiranju.
+U projektu će biti opisano funkcijsko programiranje, glavna svojstva koja funkcijski programski
+jezici imaju i svojstva kojih se treba držati ako se programira multiparadigmatskim jezikom
+koji podržava funkcijsko programiranje. Svojstva nepromjenjivosti stanja varijabli, čiste funkcije,
+funkcije prvog i višeg reda. Kako navedena svojstva utječu na razvoj programa.
+
+U poglavljima rada će biti prikazan način rada web poslužitelja koji prima zahtjeve od klijenata
+preko HTTP protokola. HTTP je protokol za komunikaciju između klijenata i poslužitelja putem web-a
+sastoji se od statusa, zaglavlja i tijela zahtjeva. Protokol je pogodan za implementaciju kod
+web poslužitelja jer je vrlo jednostavan, tj. većina poruka su strukturirane tekstualne poruke.
+
+Zadnji dio dokumentacije ima samu implementaciju web poslužitelja, opis načina rada poslužitelja,
+primjere za način korištenja i komuniciranja s poslužiteljem. Kroz isječke koda su prikazani
+dijelovi implementacije web poslužitelja te isječci imaju opis funkcionalnosti koju implementiraju.
 
 \chapter{Funkcijsko programiranje}
 
@@ -77,9 +71,9 @@ potrebno poštivati sljedeća svojstva \cite{rovzic2016lambda}:
 	      nove varijable potrebno je izvršavanje funkcija koje vraćaju neku vrijednost.
 	\item Čiste funkcije; Funkcije koje ne ovise o nikakvim vanjskim varijablama. Koriste jedino vrijednosti
 	      koje su proslijeđene direktno u funkciju, te vrijednost prema svojstvu nepromjenjivosti ne može mijenjati.
-	      Čiste funkcije garantiraju vraćanje iste vrijednosti prosljeđivanjem istih vrijednostu u funkciju,
+	      Čiste funkcije garantiraju vraćanje iste vrijednosti prosljeđivanjem istih vrijednosti u funkciju,
 	      ovo svojstvo pomaže kod optimizacije jer je funkciju potrebno pokrenuti i izračunati jedanput.
-	      Čiste funkcije nemaju popratne posljedice osim kalkulacije razultata. Takav pristup eliminira
+	      Čiste funkcije nemaju popratne posljedice osim kalkulacije rezultata. Takav pristup eliminira
 	      veliki izvor greška u programu i čini redoslijed izvršavanja nebitnim jer ne postoje popratne
 	      posljedice te funkcija može biti evaluirana u bilo kojem trenutku \cite{hughes1989functional}.
 	\item Funkcije prvog i višeg reda; Funkcije su tretirane kao objekti prvog reda tj. mogu biti rekurzivne,
@@ -158,8 +152,8 @@ Nakon pribavljanja paketa potrebno je transpilirati program što se odrađuje po
 transpilacije web poslužitelj se može pokrenuti s \texttt{node src/main.js}. Web poslužitelj se pokreće na
 adresi \texttt{0.0.0.0:8888} ili \texttt{localhost:8888}.
 
-Za potrebe lakšeg pokretanja u projektu je postavljena već transpajlirana javascript datoteka 
-web poslužitelja, pošto je ta datoteka generirana od strane transpajlera ne 
+Za potrebe lakšeg pokretanja u projektu je postavljena već transpajlirana javascript datoteka
+web poslužitelja, pošto je ta datoteka generirana od strane transpajlera ne
 mora biti pogodna za čitanje izvornog koda. Za čitanje izvornog koda predlaže se
 \texttt{main.ts} datoteka. Svi sljedeći isječci koda će sadržavati typescript.
 
@@ -326,7 +320,7 @@ Rute su zapisane u obliku \texttt{METODA} \texttt{/PUTANJA} - objašnjenje.
 	      vratiti JSON objekt s unesenim upitom tj. upitima ako ih je više.
 	\item \texttt{GET} \texttt{/form} - Učitava stranicu s primjerom slanja obrasca na poslužitelj.
 	\item \texttt{POST} \texttt{/form} - Putanja za prihvaćanje poslanog obrasca.
-    \item \texttt{GET} \texttt{/getData} - Dohvaća JSON objekt podataka prihvaćenih \texttt{POST /form} rutom.
+	\item \texttt{GET} \texttt{/getData} - Dohvaća JSON objekt podataka prihvaćenih \texttt{POST /form} rutom.
 \end{itemize}
 
 \section{Prikaz rada aplikacije}
@@ -340,15 +334,15 @@ Postavljeno je da se poslužitelj pokreće na adresi \texttt{0.0.0.0:8888}. Na a
 možemo povezati preko web pretraživača odlaskom na putanju \texttt{localhost:8888}.
 Povezivanjem na \texttt{localhost:8888/} web poslužitelj odgovara sljedećim dokumentom:
 \begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.9\textwidth]{slike/demo.png}
-    \caption{Inicijalna stranica}
-    \label{fig:init}
+	\centering
+	\includegraphics[width=0.9\textwidth]{slike/demo.png}
+	\caption{Inicijalna stranica}
+	\label{fig:init}
 \end{figure}
 
 Poslužena stranica sadrži primjere za svaku vrstu rute koju web poslužitelj podržava. Isto
 tako koristi sve rute definirane u poglavlju \ref{sec:rute}. Prva putanja vodi na primjer
-varijabilne putanje. Klikom na putanju web preglednik odlazi na putanju 
+varijabilne putanje. Klikom na putanju web preglednik odlazi na putanju
 \texttt{/demo/changeme/path/value}. Poslužitelj će generirati i poslati JSON objekt
 klijentu koji će biti prikazan ovisno o vrijednostima na pozicijama \texttt{changeme} i
 \texttt{value}. Sljedeće je prikaz odgovora koji poslužitelj šalje klijentu za
@@ -367,9 +361,9 @@ Drugi primjer koji je postavljen na stranici je URL s upitom. Radi na sličan na
 raniji primjer, ali umjesto definiranje duže rute na kraj rute se dodaje znak \texttt{?}
 iza kojeg slijedi minimalno jedan upit. Upit se piše u obliku \texttt{polje=vrijednost}.
 Moguće je postaviti više upita, za postavljanje više od jednog upita potrebno ih je odvojiti
-znakom \texttt{\&}. Primjer URL-a s više upita 
+znakom \texttt{\&}. Primjer URL-a s više upita
 \texttt{/query?polje=vrijednost\&drugoPolje=novaVrijednost\&upit=odgv}.
-Sljedeće je prikaz odgovora koji poslužitelj generira za prethodni upit: 
+Sljedeće je prikaz odgovora koji poslužitelj generira za prethodni upit:
 \begin{verbatim}
 HTTP/1.1 200 Ok
 Server:DP_PROJEKT
@@ -383,13 +377,13 @@ Treći primjer otvara stranicu s obrascem za ispunu. Stanica se sastoji od dva r
 polja za unos. Tipke za podnijeti obrazac i prikaza zapisa koji su bili poslani. Slika
 prikazuje inicijalni izgled stranice prije nego postoji bilo koji zapis:
 \begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.2\textwidth]{slike/form.png}
-    \caption{Prikaz stranice s obrascem}
-    \label{fig:form}
+	\centering
+	\includegraphics[width=0.2\textwidth]{slike/form.png}
+	\caption{Prikaz stranice s obrascem}
+	\label{fig:form}
 \end{figure}
 
-Ispunjavanjem forme i pritiskom na tipku \texttt{Submit} web preglednik na poslužitelj 
+Ispunjavanjem forme i pritiskom na tipku \texttt{Submit} web preglednik na poslužitelj
 šalje sljedeće:
 \begin{verbatim}
 POST /form HTTP/1.1
@@ -415,10 +409,10 @@ primljene podatke. Dodaje ih u datoteku i generira odgovor koji se sastoji
 od svih zapisa koji su u datoteci. Stranica će biti promijenjena kod sljedećih
 učitavanja i imati će ovakav oblik:
 \begin{figure}[h]
-    \centering
-    \includegraphics[width=0.2\textwidth]{slike/form2.png}
-    \caption{Stranica s obrascom i jednim zapisom}
-    \label{fig:form2}
+	\centering
+	\includegraphics[width=0.2\textwidth]{slike/form2.png}
+	\caption{Stranica s obrascem i jednim zapisom}
+	\label{fig:form2}
 \end{figure}
 
 Donji dio stranice će prikazivati sve zapise koji su spremljeni na poslužitelji
@@ -426,7 +420,7 @@ i rasti će dodavanjem novih zapisa.
 
 Posljednji primjer učitava web stranicu koja će zatražiti još dokumenti. Za očekivan
 prikaz stranice, stranica treba učitati jednu \texttt{.js} datoteku, jednu \texttt{.css}
-datoteku i tri \texttt{.png} datoteke. Kako na poslužitelju nebi bilo potrebno za svaku
+datoteku i tri \texttt{.png} datoteke. Kako na poslužitelju ne bi bilo potrebno za svaku
 datoteku postavljati posebnu rutu za posluživanje samo jedne datoteke, poslužitelj
 koristi definiranu wildcard rutu \texttt{/websites/*}. Zbog te rute poslužitelj može
 pribaviti sve potrebne datoteke za prikaz stranice sa svim slikama i stilom.
@@ -438,17 +432,66 @@ stranica, pošto preglednik može odbiti datoteku koju prepoznaje, ali ima zapis
 Slika prikazuje stanje mreže i sve zahtjeve poslane s klijenta na poslužitelj za
 prikaz stranice:
 \begin{figure}[h]
-    \centering
-    \includegraphics[width=\textwidth]{slike/mreza.png}
-    \caption{Prikaz zahtjeva poslanih s klijenta}
-    \label{fig:mreza}
+	\centering
+	\includegraphics[width=\textwidth]{slike/mreza.png}
+	\caption{Prikaz zahtjeva poslanih s klijenta}
+	\label{fig:mreza}
 \end{figure}
 
 
 \chapter{Zaključak}
 
-\lipsum[1-2]
+Funkcijsko programiranje kao paradigma programiranja dosta se razlikuje od
+imperativnog programiranja na koje smo naviknuti. Korištenjem jezika koji
+podržava više paradigmi programiranja potrebno je neko vrijeme za privikavanje
+i poštivanje glavnih pravila kojima je vođeno funkcijsko programiranje. U
+slučaju ovog projekta neke ugrađene funkcije u NodeJS ne poštuju funkcijski
+pristup programiranja, no niti ne moraju zbog multiparadimatskoga pristupa
+jezika, ali zbog toga dijelovi web poslužitelja nisu napisani čistim funkcijama
+(Uspostavljanje TCP veze i pisanje i čitanje s socketa).
+
+Možemo funkcijski način programiranja direktno usporediti s imperativnim.
+Najveća prepreka kod prelaska s imperativnog na funkcijski način programiranja
+je mutiranje varijabli. Funkcijski pristup ne dopušta mutiranje varijable
+nakon inicijalizacije i potrebno je na drugačije načine dobiti rezultat, jedan
+od načina je kroz više koraka rekurzije stvoriti sve podatke koje trebamo.
+Sljedeći isječak koda je primjer uparivanja elemenata dvaju nizova u jedan
+niz parova:
+\begin{lstlisting}[caption={Funkcija za uparivanje dva niza}, label=lst:uparivanje]
+const pairArrayElements = <T, O>(main: T[], other: O[]): [T, O][] => {
+    if (main.length !== other.length) {
+        return [];
+    }
+    if (main.length === 0 || other.length === 0) {
+        return [];
+    }
+    if (main.length === 1 && other.length === 1) {
+        return [[main[0], other[0]]];
+    } else {
+        return [
+            ...pairArrayElements(
+                main.slice(0, main.length - 1),
+                other.slice(0, other.length - 1)
+            ),
+            [main[main.length - 1], other[other.length - 1]],
+        ];
+    }
+};
+\end{lstlisting}
+Funkcija uparuje dva niza iste duljine (s istim brojem elemenata). Pošto u funkcijskom pristupu
+nije dopušteno mutiranje varijabli, rekurzivno rastavljamo nizove element po element i kad
+su oba niza prazna, jedan po jedan element uparujemo i vraćamo u prijašnju iteraciju rekurzije.
+Kod imperativnog pristupa bi mogli jednostavnije upariti dva niza, korištenjem jednostavnije
+funkcije i bez rekurzije, ali to može predstaviti druge probleme kao što su promjena jednog
+ili oba ulaznih niza (nema garancije da se varijable neće promijeniti), teže je izolirati
+djelove koda kod kojih se može dogoditi promjena stanja.
+
+Zaključno, funkcijsko programiranje je zanjimljiv i izazovan način programiranje koji,
+ovisno o problemu koji se rješava, može biti puno bolji pristup nego imperativni.
+Lakše je izolirati dijelove programa koji mogu stvarati probleme, primjer su
+ulazno-izlazne operacije, jer u drugim dijelovima programa neće biti nikakvih
+neočekivanih promjena stanja.
 
 \makebackmatter
-% generira popis korištene literature, popis slika (ako je primjenjivo), popis tablica (ako je primjenjivo) i popis isječaka koda (ako je primjenjivo)
+
 \end{document}
