@@ -1,7 +1,7 @@
 ### Upute za pokretanej poslužitelja
 
 - U `src` direktoriju se već nalazi datoteka `pre-compiled.js` koju je moguće
-pokrenuti za pokretanje web poslužitelja. Upute za [pokretanje](#pokretanje).
+pokrenuti za pokretanje web poslužitelja.
 
 - Projekt je napisan u `typescript`-u te je izvorni kod potrebno transpajlirati
 u `javascript` kako bi se mogao pokrenuti.
